@@ -1,25 +1,11 @@
 #!/usr/bin/env python
-"""Single EV cohort, able to (dis)charge whenever during the day, able to influence price
-
-
-Demand scheduling optimization for EV charging.
-Possible setups, in increasing difficulty:
-1. Easiest: one cohort, able to charge whenever, independent price
-2. One cohort, able to charge whenever, demand impacts prices
-3. One cohort, limited charging window, independent price
-4. One cohort, limited charging window, demand impacts prices
-5. Two cohorts, limited charging window, independent price
-6. Two cohorts, limited charging window, demand impacts prices
-
-All assume perfect knowledge ahead of time for demand / clearing price (excluding EV additional demand)
-Robust model? Could create price or demand profiles w/ rand noise representing SD from predictions to see how stable
-results are
-
-Assumes we wish to charge all to maximum capacity in the N_HOURS window
-
-Does not address possibility of selling back to grid
-Uses overly simplistic price variability, can be made arbitrarily complex however
 """
+Single EV cohort, limited hours of (dis)charge, able to influence price
+
+Presumes EV should be fully charged after final hour connected to the grid, in addition to all assumptions stated in
+the earlier singe_unbounded case.
+"""
+
 
 __author__ = "Zachary Weiss"
 
@@ -28,11 +14,11 @@ import numpy as np
 
 # global settings
 N_HOURS = 24
-ev = {"S_0": 0, "S_max": 5, "R_max": 1, "P": 1}
+ev = {"S_0": 0, "S_max": 5, "R_max": 1, "H": range(N_HOURS), "P": 1}
 # S -> stored energy
 # R -> charge rate (per hour)
+# H -> (array of) hours available to charge during
 # P -> price influence coefficient, zero makes price independent of EV demand
-# EV_CONFIG = [{"S_0": 0, "S_max": 5, "R_max": 1, "H": range(N_HOURS), "P": 0}, ]
 
 # price / load signals
 base_prices = np.random.rand(N_HOURS) * 10
