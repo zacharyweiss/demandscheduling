@@ -6,7 +6,6 @@ Presumes EV should be fully charged after final hour connected to the grid, in a
 the earlier singe_unbounded case.
 """
 
-
 __author__ = "Zachary Weiss"
 
 import pyomo.environ as pyo
@@ -14,7 +13,7 @@ import numpy as np
 
 # global settings
 N_HOURS = 24
-ev = {"S_0": 0, "S_max": 5, "R_max": 1, "H": range(N_HOURS), "P": 1}
+ev = {"S_0": 0, "S_max": 5, "R_max": 1, "H": range(12), "P": 1}
 # S -> stored energy
 # R -> charge rate (per hour)
 # H -> (array of) hours available to charge during
@@ -32,7 +31,7 @@ def main():
     hours = range(N_HOURS)
 
     # decision vars
-    model.S = pyo.Var(range(N_HOURS+1), bounds=(0, ev["S_max"]),  within=pyo.NonNegativeReals)
+    model.S = pyo.Var(range(N_HOURS + 1), bounds=(0, ev["S_max"]), within=pyo.NonNegativeReals)
     model.R = pyo.Var(hours, bounds=(-ev["R_max"], ev["R_max"]), within=pyo.Reals)
     model.P = pyo.Var(hours, within=pyo.NonNegativeReals)
 
@@ -42,15 +41,18 @@ def main():
 
     # constraints
     model.cons = pyo.ConstraintList()
-    # boundary condition: after final hour, storage must equal maximum charge
-    model.cons.add(model.S[N_HOURS] == ev["S_max"])
     # boundary condition: storage begins at initial value
     model.cons.add(model.S[0] == ev["S_0"])
+    # boundary condition: after final hour, storage must equal maximum charge
+    model.cons.add(model.S[N_HOURS] == ev["S_max"])
 
     # constraints applied each hour (bounds already handled in pyomo variable declaration)
     for t in hours:
+        # if the EV is not able to (dis)charge during the current hour, the rate must be zero
+        if t not in ev["H"]:
+            model.cons.add(model.R[t] == 0)
         # update rule, storage at next time point is current storage plus amount charged
-        model.cons.add(model.S[t+1] == model.S[t] + model.R[t])
+        model.cons.add(model.S[t + 1] == model.S[t] + model.R[t])
         # price at each hour is sum of base price and amount of price increase from the load scheduled
         model.cons.add(model.P[t] == base_prices[t] + (ev["P"] * model.R[t]))
 
@@ -62,7 +64,9 @@ def main():
     results = sol.solve(model)
 
     # display results
-    model.display()
+    model.pprint()
+    print("\n###################################################################\n")
+    results.write()
     print("done")
 
 

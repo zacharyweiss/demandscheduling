@@ -19,6 +19,8 @@ Assumes we wish to charge all to maximum capacity in the N_HOURS window
 
 Does not address possibility of selling back to grid
 Uses overly simplistic price variability, can be made arbitrarily complex however
+Assumes price of sale back to grid == clearing price
+Assumes symmetric maximum charge and discharge rates
 """
 
 __author__ = "Zachary Weiss"
