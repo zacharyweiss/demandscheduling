@@ -13,7 +13,7 @@ import numpy as np
 
 # global settings
 N_HOURS = 24
-ev = {"S_0": 0, "S_max": 5, "R_max": 1, "H": range(12), "P": 1}
+ev = {"S_0": 0, "S_max": 5, "R_max": 1, "H": range(4, 18), "P": 1}
 # S -> stored energy
 # R -> charge rate (per hour)
 # H -> (array of) hours available to charge during
@@ -26,6 +26,11 @@ base_loads = np.random.rand(N_HOURS) * 2
 
 def main():
     model = pyo.ConcreteModel()
+
+    # check valid hour configuration (no online hours specified beyond N_HOURS)
+    if max(ev["H"]) >= N_HOURS or min(ev["H"]) < 0:
+        raise SystemExit("Hours specified for EV (dis)charge must be between zero and N_HOURS. Modify the EV config "
+                         "and rerun.")
 
     # index
     hours = range(N_HOURS)
@@ -60,8 +65,7 @@ def main():
     # conopt, cyipopt, ipopt: NLP
     # path: MCP
     # more can be found via "pyomo help --solvers"
-    sol = pyo.SolverFactory('multistart')
-    results = sol.solve(model)
+    results = pyo.SolverFactory('multistart').solve(model, suppress_unbounded_warning=True)
 
     # display results
     model.pprint()
