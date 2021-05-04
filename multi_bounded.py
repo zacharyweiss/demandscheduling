@@ -14,10 +14,12 @@ import numpy as np
 
 # global settings
 N_HOURS = 24
-EV_CONFIG = [{"S_0": 0, "S_max":  5, "R_max": 1, "H":          range(7), "P": 0.5},
-             {"S_0": 2, "S_max": 10, "R_max": 2, "H":      range(5, 10), "P": 0.5},
+EV_CONFIG = [{"S_0": 0, "S_max": 5, "R_max": 1, "H": range(7), "P": 0.5},
+             {"S_0": 2, "S_max": 10, "R_max": 2, "H": range(5, 10), "P": 0.5},
              {"S_0": 5, "S_max": 20, "R_max": 3, "H": range(4, N_HOURS), "P": 0.5},
              ]
+
+
 # S -> stored energy [kWh]
 # R -> charge rate [kW] (as everywhere referenced the rate is applied over an hour--implied "*1hr" after each instance--
 #      it is effectively in units of kWh)
@@ -30,7 +32,7 @@ def main():
 
     # price signal: array of prices at each hour [$/kWh], peak value at 6pm
     # base_prices = np.random.rand(N_HOURS) * 10
-    base_prices = 5*gaussian(np.linspace(0, N_HOURS - 1, N_HOURS), 17, 26) + 5
+    base_prices = 5 * gaussian(np.linspace(0, N_HOURS - 1, N_HOURS), 17, 26) + 5
 
     # check valid hour configuration (no online hours specified beyond N_HOURS)
     for ev in EV_CONFIG:
@@ -42,7 +44,7 @@ def main():
     hours = range(N_HOURS)
     model.i = pyo.Set(initialize=[i for i, ev in enumerate(EV_CONFIG)])
     model.t = pyo.Set(initialize=hours)
-    model.t_1 = pyo.Set(initialize=range(N_HOURS+1))
+    model.t_1 = pyo.Set(initialize=range(N_HOURS + 1))
 
     def ij_init(m):
         # key pairs for S and R matrices w/i pyomo
@@ -68,7 +70,7 @@ def main():
         # boundary condition: storage begins at initial value
         model.cons.add(model.S[i, 0] == ev["S_0"])
         # boundary condition: after final schedule-able hour, storage must equal maximum charge
-        model.cons.add(model.S[i, max(ev["H"])+1] == ev["S_max"])
+        model.cons.add(model.S[i, max(ev["H"]) + 1] == ev["S_max"])
 
     # constraints applied each hour (bounds already handled in pyomo variable declaration)
     for t in hours:
@@ -92,12 +94,26 @@ def main():
     # more can be found via "pyomo help --solvers"
     results = pyo.SolverFactory('multistart').solve(model, suppress_unbounded_warning=True)
 
-    # display results
-    # model.pprint()
-    # print("\n" + "#"*150 + "\n")
-    S_sol = np.array([v.value for i, v in model.S.items()]).reshape(len(EV_CONFIG), N_HOURS+1)
+    readout(model, base_prices)
+
+
+def lrange(*args):
+    """drop in replacement for 'range()', if one wishes to easily concatenate ranges with '+' in the 'EV_CONFIG'"""
+    return list(range(*args))
+
+
+def gaussian(x, mu, sig):
+    return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
+
+
+def readout(model, base_prices):
+    S_sol = np.array([v.value for i, v in model.S.items()]).reshape(len(EV_CONFIG), N_HOURS + 1)
     R_sol = np.array([v.value for i, v in model.R.items()]).reshape(len(EV_CONFIG), N_HOURS)
     P_sol = np.array([v.value for i, v in model.P.items()])
+
+    costs = np.array([np.array(ev_R * P_sol) for ev_R in R_sol])
+    ev_tot_cost = costs.sum(axis=1)
+    ev_avg_price = ev_tot_cost / R_sol.sum(axis=1)
 
     def pretty_print(arr):
         # zero out floating point errors within tolerance
@@ -111,30 +127,40 @@ def main():
             num_str = ''.join(
                 f'\033[92m{trimmer(item): >7s}\033[0m' if t in EV_CONFIG[i]["H"] else
                 f'{trimmer(item): >7s}' for t, item in enumerate(row))
-            print("{:<6s}{}".format(f"EV#{i}", num_str))
+            print("\033[3m{:<6s}\033[0m{}".format(f"EV#{i}", num_str))
 
-    print("\nValues highlighted in green indicate the EV was available for (dis)charge during that hour.\n")
+    print("""\n\033[1mKey\033[0m
+\033[3mS\033[0m -> stored energy [kWh]
+\033[3mR\033[0m -> charge rate [kW] (as everywhere referenced the rate is applied over an hour--implied "*1hr" after each instance--
+     it is effectively in units of kWh)
+\033[3mH\033[0m -> (array of) hours available to charge during [unitless indexes]
+\033[3mP\033[0m -> price influence coefficient, zero makes price independent of EV demand [$/kWh^2]
+Values highlighted in green indicate the EV was available for (dis)charge during that hour.""")
+
+    print("\n\033[1mEV Cohort Configuration\033[0m")
+    for i, ev in enumerate(EV_CONFIG):
+        print("\033[3m{:<12s}\033[0m".format(f"EV#{i}") + "".join("{:<25s}".format(f"\033[3m{k}\033[0m: {ev[k]}") for k in ev))
+
+    print("\n\033[1mStorage values by hour [kWh]\033[0m")
     hour_arr = np.append(np.add(lrange(N_HOURS), 1), "S_final")
-    print("Storage values by hour")
-    print("{:<8s}".format("Hour") + ''.join("{:^7s}".format(hr) for hr in hour_arr))
+    print("\033[3m{:<9s}".format("Hour") + ''.join("{:^7s}".format(hr) for hr in hour_arr) + "\033[0m")
     pretty_print(S_sol)
-    print("\nCharging rates by hour")
+
+    print("\n\033[1mCharging rates by hour [kW]\033[0m")
     pretty_print(R_sol)
-    print("\nBase and adjusted clearing price (after additional EV load) by hour")
-    print("{:<6s}".format("Π") + "".join(f"{item: >7.2f}" for item in base_prices))
-    print("{:<6s}".format("Π_adj") + "".join(f"{item: >7.2f}" for item in P_sol))
+
+    print("\n\033[1mBase and adjusted clearing price (after additional EV load) by hour [$/kWh]\033[0m")
+    print("\033[3m{:<6s}\033[0m".format("Π") + "".join(f"{item: >7.2f}" for item in base_prices))
+    print("\033[3m{:<6s}\033[0m".format("Π_adj") + "".join(f"{item: >7.2f}" for item in P_sol))
+
+    print("\n\033[1mTotal cost by EV cohort\033[0m")
+    for i, ev in enumerate(EV_CONFIG):
+        print("\033[3m{:<8s}\033[0m{:>8s}    {}".format(f"EV#{i}", f"${ev_tot_cost[i]:.2f}", "(average "
+              f"of ${ev_avg_price[i]:.2f} per unit of energy)"))
+    print(f"\033[3mOverall\033[0m  ${model.cost():.2f}    (average of ${model.cost() / sum(sum(R_sol)):.2f} per unit "
+          f"of energy)")
+
     print("\n")
-
-    # results.write()
-
-
-def lrange(*args):
-    """drop in replacement for 'range()', if one wishes to easily concatenate ranges with '+' in the 'EV_CONFIG'"""
-    return list(range(*args))
-
-
-def gaussian(x, mu, sig):
-    return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
 
 
 """
@@ -147,7 +173,6 @@ def df_from_pyo(model_var):
     df.index = pd.MultiIndex.from_tuples([k for k, v in df.iterrows()])
     return df[0]
 """
-
 
 if __name__ == '__main__':
     main()
