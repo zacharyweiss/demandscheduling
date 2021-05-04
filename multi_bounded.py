@@ -20,6 +20,7 @@ EV_CONFIG = [{"S_0": 0, "S_max": 5, "R_max": 1, "H": range(7), "P": 0.5},
              ]
 
 
+# Example entry: {"S_0": 0, "S_max": 5, "R_max": 1, "H": range(7), "P": 0.5}
 # S -> stored energy [kWh]
 # R -> charge rate [kW] (as everywhere referenced the rate is applied over an hour--implied "*1hr" after each instance--
 #      it is effectively in units of kWh)
@@ -28,6 +29,8 @@ EV_CONFIG = [{"S_0": 0, "S_max": 5, "R_max": 1, "H": range(7), "P": 0.5},
 
 
 def main():
+    notes()
+
     model = pyo.ConcreteModel()
 
     # price signal: array of prices at each hour [$/kWh], peak value at 6pm
@@ -106,6 +109,26 @@ def gaussian(x, mu, sig):
     return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
 
 
+def notes():
+    print("""\n\033[1mKey and Notes\033[0m
+\033[3mDependencies\033[0m: pyomo, numpy, and the multistart NLP solver (may come preinstalled with pyomo)
+\033[3mS\033[0m -> stored energy [kWh]
+\033[3mR\033[0m -> charge rate [kW] (as everywhere referenced the rate is applied over an hour\u2014implied "*1hr" after each instance\u2014
+     it is effectively in units of kWh)
+\033[3mH\033[0m -> (array of) hours available to charge during [unitless indexes]
+\033[3mP\033[0m -> price influence coefficient, zero makes price independent of EV demand [$/kWh^2]
+
+Values highlighted in green or red indicate the EV was available for charge or discharge (selling back to the grid) 
+during that hour, whereas the EV cohort is offline for all entries in the default text color. To compute for other EV 
+configurations, edit the EV_CONFIG variable at the top of this file and re-run, following the example entry format for 
+each new EV cohort, separated by commas. If tables appear weird, expand your window horizontally or disable text wrapping.""")
+
+    print("\n\033[1mEV Cohort Configuration\033[0m")
+    for i, ev in enumerate(EV_CONFIG):
+        print("\033[3m{:<12s}\033[0m".format(f"EV #{i}") + "".join("{:<25s}".format(f"\033[3m{k}\033[0m: {ev[k]}") for k
+                                                                   in ev))
+
+
 def readout(model, base_prices):
     S_sol = np.array([v.value for i, v in model.S.items()]).reshape(len(EV_CONFIG), N_HOURS + 1)
     R_sol = np.array([v.value for i, v in model.R.items()]).reshape(len(EV_CONFIG), N_HOURS)
@@ -125,21 +148,9 @@ def readout(model, base_prices):
 
         for i, row in enumerate(arr):
             num_str = ''.join(
-                f'\033[92m{trimmer(item): >7s}\033[0m' if t in EV_CONFIG[i]["H"] else
-                f'{trimmer(item): >7s}' for t, item in enumerate(row))
-            print("\033[3m{:<6s}\033[0m{}".format(f"EV#{i}", num_str))
-
-    print("""\n\033[1mKey\033[0m
-\033[3mS\033[0m -> stored energy [kWh]
-\033[3mR\033[0m -> charge rate [kW] (as everywhere referenced the rate is applied over an hour--implied "*1hr" after each instance--
-     it is effectively in units of kWh)
-\033[3mH\033[0m -> (array of) hours available to charge during [unitless indexes]
-\033[3mP\033[0m -> price influence coefficient, zero makes price independent of EV demand [$/kWh^2]
-Values highlighted in green indicate the EV was available for (dis)charge during that hour.""")
-
-    print("\n\033[1mEV Cohort Configuration\033[0m")
-    for i, ev in enumerate(EV_CONFIG):
-        print("\033[3m{:<12s}\033[0m".format(f"EV#{i}") + "".join("{:<25s}".format(f"\033[3m{k}\033[0m: {ev[k]}") for k in ev))
+                (f'\033[92m{trimmer(val): >7s}\033[0m' if val >= 0 else f'\033[91m{trimmer(val): >7s}\033[0m')
+                if t in EV_CONFIG[i]["H"] else f'{trimmer(val): >7s}' for t, val in enumerate(row))
+            print("\033[3m{:<6s}\033[0m{}".format(f"EV #{i}", num_str))
 
     print("\n\033[1mStorage values by hour [kWh]\033[0m")
     hour_arr = np.append(np.add(lrange(N_HOURS), 1), "S_final")
@@ -155,24 +166,11 @@ Values highlighted in green indicate the EV was available for (dis)charge during
 
     print("\n\033[1mTotal cost by EV cohort\033[0m")
     for i, ev in enumerate(EV_CONFIG):
-        print("\033[3m{:<8s}\033[0m{:>8s}    {}".format(f"EV#{i}", f"${ev_tot_cost[i]:.2f}", "(average "
-              f"of ${ev_avg_price[i]:.2f} per unit of energy)"))
+        print("\033[3m{:<8s}\033[0m{:>8s}    {}".format(f"EV #{i}", f"${ev_tot_cost[i]:.2f}", "(average "
+                                                                                              f"of ${ev_avg_price[i]:.2f} per unit of energy)"))
     print(f"\033[3mOverall\033[0m  ${model.cost():.2f}    (average of ${model.cost() / sum(sum(R_sol)):.2f} per unit "
           f"of energy)")
 
-    print("\n")
-
-
-"""
-def df_from_pyo(model_var):
-    # Extremely messy way to extract 2D variable values from pyomo back into pandas
-    # poor documentation in pyomo, and solutions online don't generalize well to higher-dim vars.
-    # This works passably, and allows for normal tuple indexing, but the df shape is still wrong if inspected
-    data = {(i, j): v.value for (i, j), v in model_var.items()}
-    df = pd.DataFrame.from_dict(data, orient="index")
-    df.index = pd.MultiIndex.from_tuples([k for k, v in df.iterrows()])
-    return df[0]
-"""
 
 if __name__ == '__main__':
     main()
