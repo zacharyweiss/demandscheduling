@@ -10,6 +10,7 @@ Possible setups, in increasing difficulty:
 4. One cohort, limited charging window, demand impacts prices
 5. Two cohorts, limited charging window, independent price
 6. Two cohorts, limited charging window, demand impacts prices
+7. caps to total system load?
 
 All assume perfect knowledge ahead of time for demand / clearing price (excluding EV additional demand)
 Robust model? Could create price or demand profiles w/ rand noise representing SD from predictions to see how stable
@@ -30,11 +31,11 @@ import numpy as np
 
 # global settings
 N_HOURS = 24
-ev = {"S_0": 0, "S_max": 5, "R_max": 1, "P": 1}
+EV_CONFIG = {"S_0": 0, "S_max": 5, "R_max": 1, "P": 1}
 # S -> stored energy
 # R -> charge rate (per hour)
 # P -> price influence coefficient, zero makes price independent of EV demand
-# EV_CONFIG = [{"S_0": 0, "S_max": 5, "R_max": 1, "H": range(N_HOURS), "P": 0}, ]
+#
 
 # price / load signals
 base_prices = np.random.rand(N_HOURS) * 10
@@ -48,8 +49,8 @@ def main():
     hours = range(N_HOURS)
 
     # decision vars
-    model.S = pyo.Var(range(N_HOURS+1), bounds=(0, ev["S_max"]),  within=pyo.NonNegativeReals)
-    model.R = pyo.Var(hours, bounds=(-ev["R_max"], ev["R_max"]), within=pyo.Reals)
+    model.S = pyo.Var(range(N_HOURS+1), bounds=(0, EV_CONFIG["S_max"]), within=pyo.NonNegativeReals)
+    model.R = pyo.Var(hours, bounds=(-EV_CONFIG["R_max"], EV_CONFIG["R_max"]), within=pyo.Reals)
     model.P = pyo.Var(hours, within=pyo.NonNegativeReals)
 
     # objective function
@@ -59,23 +60,22 @@ def main():
     # constraints
     model.cons = pyo.ConstraintList()
     # boundary condition: after final hour, storage must equal maximum charge
-    model.cons.add(model.S[N_HOURS] == ev["S_max"])
+    model.cons.add(model.S[N_HOURS] == EV_CONFIG["S_max"])
     # boundary condition: storage begins at initial value
-    model.cons.add(model.S[0] == ev["S_0"])
+    model.cons.add(model.S[0] == EV_CONFIG["S_0"])
 
     # constraints applied each hour (bounds already handled in pyomo variable declaration)
     for t in hours:
         # update rule, storage at next time point is current storage plus amount charged
         model.cons.add(model.S[t+1] == model.S[t] + model.R[t])
         # price at each hour is sum of base price and amount of price increase from the load scheduled
-        model.cons.add(model.P[t] == base_prices[t] + (ev["P"] * model.R[t]))
+        model.cons.add(model.P[t] == base_prices[t] + (EV_CONFIG["P"] * model.R[t]))
 
     # cbc, glpk, gurobi, cplex, pico, scip, xpress: LP/MIP solvers
     # conopt, cyipopt, ipopt: NLP
     # path: MCP
     # more can be found via "pyomo help --solvers"
-    sol = pyo.SolverFactory('multistart')
-    results = sol.solve(model)
+    results = pyo.SolverFactory('multistart').solve(model, suppress_unbounded_warning=True)
 
     # display results
     model.display()
