@@ -18,8 +18,6 @@ EV_CONFIG = [{"S_0": 0, "S_max": 5, "R_max": 1, "H": range(7), "P": 0.5},
              {"S_0": 2, "S_max": 10, "R_max": 2, "H": range(5, 10), "P": 0.5},
              {"S_0": 5, "S_max": 20, "R_max": 3, "H": range(4, N_HOURS), "P": 0.5},
              ]
-
-
 # Example entry: {"S_0": 0, "S_max": 5, "R_max": 1, "H": range(7), "P": 0.5}
 # S -> stored energy [kWh]
 # R -> charge rate [kW] (as everywhere referenced the rate is applied over an hour--implied "*1hr" after each instance--
@@ -91,10 +89,6 @@ def main():
         # price at each hour is sum of base price and amount of price increase from the load scheduled
         model.cons.add(model.P[t] == base_prices[t] + sum([ev["P"] * model.R[i, t] for i, ev in enumerate(EV_CONFIG)]))
 
-    # cbc, glpk, gurobi, cplex, pico, scip, xpress: LP/MIP solvers
-    # conopt, cyipopt, ipopt: NLP
-    # path: MCP
-    # more can be found via "pyomo help --solvers"
     results = pyo.SolverFactory('multistart').solve(model, suppress_unbounded_warning=True)
 
     readout(model, base_prices)
