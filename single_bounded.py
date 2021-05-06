@@ -21,7 +21,6 @@ EV_CONFIG = {"S_0": 0, "S_max": 5, "R_max": 1, "H": range(4, 18), "P": 1}
 
 # price / load signals
 base_prices = np.random.rand(N_HOURS) * 10
-base_loads = np.random.rand(N_HOURS) * 2
 
 
 def main():

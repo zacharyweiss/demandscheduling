@@ -5,6 +5,8 @@ Multiple EV cohorts, limited hours of (dis)charge, able to influence price
 Same assumptions as in single_bounded. Doesn't account for modular math if running overnight (i.e. 6pm to 8am is parsed
 as 12am to 8am followed by 6pm to 12am). Can be abated if one chooses to study a 2-day (or longer) period by increasing
 N_HOURS.
+
+To install all dependencies with conda, run "conda install numpy && conda install -c conda-forge pyomo ipopt=3.11.1"
 """
 
 __author__ = "Zachary Weiss"
@@ -105,7 +107,8 @@ def gaussian(x, mu, sig):
 
 def notes():
     print("""\n\033[1mKey and Notes\033[0m
-\033[3mDependencies\033[0m: pyomo, numpy, and the multistart NLP solver (may come preinstalled with pyomo)
+\033[3mDependencies\033[0m: pyomo, numpy, ipopt, and multistart (NLP solver, should come pre-installed with pyomo)
+If not fully installed, run "conda install numpy && conda install -c conda-forge pyomo ipopt=3.11.1" without quotes.
 \033[3mS\033[0m -> stored energy [kWh]
 \033[3mR\033[0m -> charge rate [kW] (as everywhere referenced the rate is applied over an hour\u2014implied "*1hr" after each instance\u2014
      it is effectively in units of kWh)

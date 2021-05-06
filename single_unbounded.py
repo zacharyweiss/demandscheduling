@@ -35,11 +35,9 @@ EV_CONFIG = {"S_0": 0, "S_max": 5, "R_max": 1, "P": 1}
 # S -> stored energy
 # R -> charge rate (per hour)
 # P -> price influence coefficient, zero makes price independent of EV demand
-#
 
 # price / load signals
 base_prices = np.random.rand(N_HOURS) * 10
-base_loads = np.random.rand(N_HOURS) * 2
 
 
 def main():
