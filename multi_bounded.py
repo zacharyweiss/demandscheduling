@@ -2,10 +2,6 @@
 """
 Multiple EV cohorts, limited hours of (dis)charge, able to influence price
 
-Same assumptions as in single_bounded. Doesn't account for modular math if running overnight (i.e. 6pm to 8am is parsed
-as 12am to 8am followed by 6pm to 12am). Can be abated if one chooses to study a 2-day (or longer) period by increasing
-N_HOURS.
-
 To install all dependencies with conda, run "conda install numpy && conda install -c conda-forge pyomo ipopt=3.11.1"
 """
 
@@ -20,7 +16,7 @@ EV_CONFIG = [{"S_0": 0, "S_max": 5, "R_max": 1, "H": range(7), "P": 0.5},
              {"S_0": 2, "S_max": 10, "R_max": 2, "H": range(5, 10), "P": 0.5},
              {"S_0": 5, "S_max": 20, "R_max": 3, "H": range(4, N_HOURS), "P": 0.5},
              ]
-# Example entry: {"S_0": 0, "S_max": 5, "R_max": 1, "H": range(7), "P": 0.5}
+# Sample entry: {"S_0": 0, "S_max": 5, "R_max": 1, "H": range(7), "P": 0.5}
 # S -> stored energy [kWh]
 # R -> charge rate [kW] (as everywhere referenced the rate is applied over an hour--implied "*1hr" after each instance--
 #      it is effectively in units of kWh)
@@ -164,7 +160,7 @@ def readout(model, base_prices):
     print("\n\033[1mTotal cost by EV cohort\033[0m")
     for i, ev in enumerate(EV_CONFIG):
         print("\033[3m{:<8s}\033[0m{:>8s}    {}".format(f"EV #{i}", f"${ev_tot_cost[i]:.2f}", "(average "
-                                                                                              f"of ${ev_avg_price[i]:.2f} per unit of energy)"))
+              f"of ${ev_avg_price[i]:.2f} per unit of energy)"))
     print(f"\033[3mOverall\033[0m  ${model.cost():.2f}    (average of ${model.cost() / sum(sum(R_sol)):.2f} per unit "
           f"of energy)")
 
